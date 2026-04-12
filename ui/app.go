@@ -6,8 +6,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"fmt"
-	"strings"
 )
+
+const greeting = `
+ ██████╗ ██████╗ ██████╗  ██████╗  ██╗     ██████╗██╗     ██╗
+██╔════╝██╔═══██╗██╔══██╗██╔════╝  ██║    ██╔════╝██║     ██║
+██║     ██║   ██║██████╔╝██║  ███╗ ██║    ██║     ██║     ██║
+██║     ██║   ██║██╔══██╗██║   ██║ ██║    ██║     ██║     ██║
+╚██████╗╚██████╔╝██║  ██║╚██████╔╝ ██║    ╚██████╗███████╗██║
+ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═╝     ╚═════╝╚══════╝╚═╝
+`
+
+var authorStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#7D56F4"))
 
 // MODEL DATA
 
@@ -29,7 +41,7 @@ func NewCorgiTui(text string) corgiTui {
 	ti.SetVirtualCursor(false)
 	ti.Focus()
 	ti.CharLimit = 156
-	ti.SetWidth(20)
+	ti.SetWidth(100)
 
 	return corgiTui{text: text, textInput: ti}
 }
@@ -39,12 +51,10 @@ func (s corgiTui) Init() tea.Cmd { return textinput.Blink }
 // VIEW
 
 func (s corgiTui) View() tea.View {
-	textLen := len(s.text)
-	topAndBottomBar := strings.Repeat("*", textLen+4)
-	greeting := fmt.Sprintf("%s\n* %s *\n%s", topAndBottomBar, s.text, topAndBottomBar)
 	var b bytes.Buffer
 	for _, v := range s.messages {
-		b.WriteString(fmt.Sprintf("%s: %s\n", v.Author, v.Content))
+		styledAuthor := authorStyle.Render(string(v.Author))
+		b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
 	}
 
 	var c *tea.Cursor
