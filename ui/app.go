@@ -20,6 +20,8 @@ type corgiTui struct {
 	textInput textinput.Model
 	messages  []Message
 	quitting  bool
+	width     int
+	height    int
 }
 
 func NewCorgiTui(text string) corgiTui {
@@ -44,18 +46,26 @@ func (s corgiTui) View() tea.View {
 		b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
 	}
 
-	var c *tea.Cursor
-	if !s.textInput.VirtualCursor() {
-		c = s.textInput.Cursor()
-		c.Y += lipgloss.Height(greeting) + lipgloss.Height(b.String())
-	}
-
 	inputBlock := lipgloss.JoinVertical(lipgloss.Top, s.textInput.View(), s.footerView())
 	if s.quitting {
 		inputBlock += "\n"
 	}
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, greeting, b.String(), inputBlock))
+	var spacer bytes.Buffer
+	spacerAmount := s.height - lipgloss.Height(greeting) - lipgloss.Height(inputBlock) - lipgloss.Height(b.String())
+
+	for i := 0; i < spacerAmount; i++ {
+		spacer.WriteString("\n")
+	}
+
+	var c *tea.Cursor
+	if !s.textInput.VirtualCursor() {
+		c = s.textInput.Cursor()
+		c.Y += lipgloss.Height(greeting) + lipgloss.Height(spacer.String()) + lipgloss.Height(b.String())
+	}
+
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, greeting, spacer.String(), b.String(), inputBlock))
+	v.AltScreen = true
 	v.Cursor = c
 	return v
 }
@@ -65,6 +75,11 @@ func (s corgiTui) View() tea.View {
 func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		s.height = msg.Height
+		s.width = msg.Width
+		return s, cmd
+
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
