@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -10,9 +11,15 @@ import (
 
 // MODEL DATA
 
+type Message struct {
+	Author  string
+	Content string
+}
+
 type corgiTui struct {
 	text      string
 	textInput textinput.Model
+	messages  []Message
 	quitting  bool
 }
 
@@ -35,11 +42,15 @@ func (s corgiTui) View() tea.View {
 	textLen := len(s.text)
 	topAndBottomBar := strings.Repeat("*", textLen+4)
 	greeting := fmt.Sprintf("%s\n* %s *\n%s", topAndBottomBar, s.text, topAndBottomBar)
+	var b bytes.Buffer
+	for _, v := range s.messages {
+		b.WriteString(fmt.Sprintf("%s: %s\n", v.Author, v.Content))
+	}
 
 	var c *tea.Cursor
 	if !s.textInput.VirtualCursor() {
 		c = s.textInput.Cursor()
-		c.Y += lipgloss.Height(greeting)
+		c.Y += lipgloss.Height(greeting) + lipgloss.Height(b.String())
 	}
 
 	inputBlock := lipgloss.JoinVertical(lipgloss.Top, s.textInput.View(), s.footerView())
@@ -47,7 +58,7 @@ func (s corgiTui) View() tea.View {
 		inputBlock += "\n"
 	}
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, greeting, inputBlock))
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, greeting, b.String(), inputBlock))
 	v.Cursor = c
 	return v
 }
@@ -59,9 +70,16 @@ func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "ctrl+c", "enter", "esc":
+		case "ctrl+c", "esc":
 			s.quitting = true
 			return s, tea.Quit
+		case "enter":
+			s.messages = append(s.messages, Message{
+				Author:  "Agamemnon",
+				Content: s.textInput.Value(),
+			})
+			s.textInput.Reset()
+			return s, cmd
 		}
 	}
 
