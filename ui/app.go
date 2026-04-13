@@ -17,7 +17,7 @@ type Message struct {
 	Content string
 }
 
-type corgiTui struct {
+type Model struct {
 	text      string
 	textInput textinput.Model
 	messages  []Message
@@ -27,7 +27,7 @@ type corgiTui struct {
 	viewport  viewport.Model
 }
 
-func NewCorgiTui(text string) corgiTui {
+func NewCorgiTui(text string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "What's on your mind?"
 	ti.SetVirtualCursor(false)
@@ -35,31 +35,31 @@ func NewCorgiTui(text string) corgiTui {
 	ti.CharLimit = 156
 	ti.SetWidth(100)
 
-	return corgiTui{text: text, textInput: ti}
+	return Model{text: text, textInput: ti}
 }
 
-func (s corgiTui) Init() tea.Cmd { return textinput.Blink }
+func (m Model) Init() tea.Cmd { return textinput.Blink }
 
 // VIEW
 
-func (s corgiTui) View() tea.View {
+func (m Model) View() tea.View {
 	var v tea.View
 	var b bytes.Buffer
-	for _, v := range s.messages {
+	for _, v := range m.messages {
 		styledAuthor := authorStyle.Render(string(v.Author))
 		b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
 	}
 
 	var c *tea.Cursor
-	if !s.textInput.VirtualCursor() {
-		c = s.textInput.Cursor()
-		c.Y += lipgloss.Height(greeting) + lipgloss.Height(s.viewport.View()) + lipgloss.Height(b.String())
+	if !m.textInput.VirtualCursor() {
+		c = m.textInput.Cursor()
+		c.Y += lipgloss.Height(greeting) + lipgloss.Height(m.viewport.View()) + lipgloss.Height(b.String())
 	}
 
-	if !s.ready {
+	if !m.ready {
 		v.SetContent("\n Initializing...")
 	} else {
-		v.SetContent(fmt.Sprintf("%s\n%s\n%s", greeting, s.viewport.View(), s.footerView()))
+		v.SetContent(fmt.Sprintf("%s\n%s\n%s", greeting, m.viewport.View(), m.footerView()))
 	}
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
@@ -70,64 +70,64 @@ func (s corgiTui) View() tea.View {
 
 // UPDATE
 
-func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		headerHeight := lipgloss.Height(greeting)
-		footerHeight := lipgloss.Height(s.footerView())
+		footerHeight := lipgloss.Height(m.footerView())
 		verticalMarginHeight := headerHeight + footerHeight
-		if !s.ready {
+		if !m.ready {
 			// Since this program is using the full size of the viewport we
 			// need to wait until we've received the window dimensions before
 			// we can initialize the viewport. The initial dimensions come in
 			// quickly, though asynchronously, which is why we wait for them
 			// here.
-			s.viewport = viewport.New(viewport.WithWidth(msg.Width), viewport.WithHeight(msg.Height-verticalMarginHeight))
-			s.viewport.YPosition = headerHeight
-			s.viewport.HighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("34"))
-			s.viewport.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("47"))
-			s.viewport.SetContent(s.content)
-			s.viewport.SetHighlights(regexp.MustCompile("artichoke").FindAllStringIndex(s.content, -1))
-			s.viewport.HighlightNext()
-			s.ready = true
+			m.viewport = viewport.New(viewport.WithWidth(msg.Width), viewport.WithHeight(msg.Height-verticalMarginHeight))
+			m.viewport.YPosition = headerHeight
+			m.viewport.HighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("34"))
+			m.viewport.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("47"))
+			m.viewport.SetContent(m.content)
+			m.viewport.SetHighlights(regexp.MustCompile("artichoke").FindAllStringIndex(m.content, -1))
+			m.viewport.HighlightNext()
+			m.ready = true
 		} else {
-			s.viewport.SetWidth(msg.Width)
-			s.viewport.SetHeight(msg.Height - verticalMarginHeight)
+			m.viewport.SetWidth(msg.Width)
+			m.viewport.SetHeight(msg.Height - verticalMarginHeight)
 		}
 
-		return s, cmd
+		return m, cmd
 
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			s.quitting = true
-			return s, tea.Quit
+			m.quitting = true
+			return m, tea.Quit
 		case "enter":
-			s.messages = append(s.messages, Message{
+			m.messages = append(m.messages, Message{
 				Author:  "Agamemnon",
-				Content: s.textInput.Value(),
+				Content: m.textInput.Value(),
 			})
-			s.textInput.Reset()
+			m.textInput.Reset()
 			var b bytes.Buffer
 
-			for _, v := range s.messages {
+			for _, v := range m.messages {
 				styledAuthor := authorStyle.Render(string(v.Author))
 				b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
 			}
 
-			s.content = b.String()
-			s.viewport.SetContent(s.content)
-			s.viewport.GotoBottom()
+			m.content = b.String()
+			m.viewport.SetContent(m.content)
+			m.viewport.GotoBottom()
 
-			return s, cmd
+			return m, cmd
 		}
 	}
 
-	s.textInput, cmd = s.textInput.Update(msg)
-	return s, cmd
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
-func (s corgiTui) footerView() string {
-	return lipgloss.JoinVertical(lipgloss.Top, s.textInput.View())
+func (m Model) footerView() string {
+	return lipgloss.JoinVertical(lipgloss.Top, m.textInput.View())
 }
