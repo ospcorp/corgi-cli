@@ -12,22 +12,22 @@ import (
 
 // MODEL DATA
 
-type Message struct {
-	Author  string
-	Content string
+type message struct {
+	author  string
+	content string
 }
 
-type Model struct {
+type model struct {
 	text      string
 	textInput textinput.Model
-	messages  []Message
+	messages  []message
 	content   string
 	quitting  bool
 	ready     bool
 	viewport  viewport.Model
 }
 
-func NewCorgiTui(text string) Model {
+func NewCorgiTui(text string) model {
 	ti := textinput.New()
 	ti.Placeholder = "What's on your mind?"
 	ti.SetVirtualCursor(false)
@@ -35,19 +35,19 @@ func NewCorgiTui(text string) Model {
 	ti.CharLimit = 156
 	ti.SetWidth(100)
 
-	return Model{text: text, textInput: ti}
+	return model{text: text, textInput: ti}
 }
 
-func (m Model) Init() tea.Cmd { return textinput.Blink }
+func (m model) Init() tea.Cmd { return textinput.Blink }
 
 // VIEW
 
-func (m Model) View() tea.View {
+func (m model) View() tea.View {
 	var v tea.View
 	var b bytes.Buffer
 	for _, v := range m.messages {
-		styledAuthor := authorStyle.Render(string(v.Author))
-		b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
+		styledauthor := authorStyle.Render(string(v.author))
+		b.WriteString(fmt.Sprintf("%s: %s\n", styledauthor, v.content))
 	}
 
 	var c *tea.Cursor
@@ -70,7 +70,7 @@ func (m Model) View() tea.View {
 
 // UPDATE
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -104,16 +104,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "enter":
-			m.messages = append(m.messages, Message{
-				Author:  "Agamemnon",
-				Content: m.textInput.Value(),
+			m.messages = append(m.messages, message{
+				author:  "Agamemnon",
+				content: m.textInput.Value(),
 			})
 			m.textInput.Reset()
 			var b bytes.Buffer
 
 			for _, v := range m.messages {
-				styledAuthor := authorStyle.Render(string(v.Author))
-				b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
+				styledauthor := authorStyle.Render(string(v.author))
+				b.WriteString(fmt.Sprintf("%s: %s\n", styledauthor, v.content))
 			}
 
 			m.content = b.String()
@@ -128,6 +128,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) footerView() string {
+func (m model) footerView() string {
 	return lipgloss.JoinVertical(lipgloss.Top, m.textInput.View())
 }
