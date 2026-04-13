@@ -3,9 +3,11 @@ package ui
 import (
 	"bytes"
 	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"fmt"
+	"regexp"
 )
 
 // MODEL DATA
@@ -19,9 +21,10 @@ type corgiTui struct {
 	text      string
 	textInput textinput.Model
 	messages  []Message
+	content   string
 	quitting  bool
-	width     int
-	height    int
+	ready     bool
+	viewport  viewport.Model
 }
 
 func NewCorgiTui(text string) corgiTui {
@@ -40,33 +43,28 @@ func (s corgiTui) Init() tea.Cmd { return textinput.Blink }
 // VIEW
 
 func (s corgiTui) View() tea.View {
+	var v tea.View
 	var b bytes.Buffer
 	for _, v := range s.messages {
 		styledAuthor := authorStyle.Render(string(v.Author))
 		b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
 	}
 
-	inputBlock := lipgloss.JoinVertical(lipgloss.Top, s.textInput.View(), s.footerView())
-	if s.quitting {
-		inputBlock += "\n"
-	}
-
-	var spacer bytes.Buffer
-	spacerAmount := s.height - lipgloss.Height(greeting) - lipgloss.Height(inputBlock) - lipgloss.Height(b.String())
-
-	for i := 0; i < spacerAmount; i++ {
-		spacer.WriteString("\n")
-	}
-
 	var c *tea.Cursor
 	if !s.textInput.VirtualCursor() {
 		c = s.textInput.Cursor()
-		c.Y += lipgloss.Height(greeting) + lipgloss.Height(spacer.String()) + lipgloss.Height(b.String())
+		c.Y += lipgloss.Height(greeting) + lipgloss.Height(s.viewport.View()) + lipgloss.Height(b.String())
 	}
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, greeting, spacer.String(), b.String(), inputBlock))
+	if !s.ready {
+		v.SetContent("\n Initializing...")
+	} else {
+		v.SetContent(fmt.Sprintf("%s\n%s\n%s", greeting, s.viewport.View(), s.footerView()))
+	}
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	v.Cursor = c
+
 	return v
 }
 
@@ -76,8 +74,28 @@ func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		s.height = msg.Height
-		s.width = msg.Width
+		headerHeight := lipgloss.Height(greeting)
+		footerHeight := lipgloss.Height(s.footerView())
+		verticalMarginHeight := headerHeight + footerHeight
+		if !s.ready {
+			// Since this program is using the full size of the viewport we
+			// need to wait until we've received the window dimensions before
+			// we can initialize the viewport. The initial dimensions come in
+			// quickly, though asynchronously, which is why we wait for them
+			// here.
+			s.viewport = viewport.New(viewport.WithWidth(msg.Width), viewport.WithHeight(msg.Height-verticalMarginHeight))
+			s.viewport.YPosition = headerHeight
+			s.viewport.HighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("34"))
+			s.viewport.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("47"))
+			s.viewport.SetContent(s.content)
+			s.viewport.SetHighlights(regexp.MustCompile("artichoke").FindAllStringIndex(s.content, -1))
+			s.viewport.HighlightNext()
+			s.ready = true
+		} else {
+			s.viewport.SetWidth(msg.Width)
+			s.viewport.SetHeight(msg.Height - verticalMarginHeight)
+		}
+
 		return s, cmd
 
 	case tea.KeyPressMsg:
@@ -91,6 +109,17 @@ func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Content: s.textInput.Value(),
 			})
 			s.textInput.Reset()
+			var b bytes.Buffer
+
+			for _, v := range s.messages {
+				styledAuthor := authorStyle.Render(string(v.Author))
+				b.WriteString(fmt.Sprintf("%s: %s\n", styledAuthor, v.Content))
+			}
+
+			s.content = b.String()
+			s.viewport.SetContent(s.content)
+			s.viewport.GotoBottom()
+
 			return s, cmd
 		}
 	}
@@ -99,4 +128,6 @@ func (s corgiTui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, cmd
 }
 
-func (s corgiTui) footerView() string { return "\n(esc to quit)" }
+func (s corgiTui) footerView() string {
+	return lipgloss.JoinVertical(lipgloss.Top, s.textInput.View())
+}
